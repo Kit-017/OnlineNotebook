@@ -176,7 +176,15 @@
     const li = document.createElement('li');
     li.classList.add('note-item');
     
+    const noteHeader = document.createElement('div');
+    noteHeader.classList.add('note-header');
+    noteHeader.innerHTML = `
+      <span class="toggle-icon">▶️</span>
+      Заметка ${index + 1}
+    `;
+    
     const noteContentDiv = document.createElement('div');
+    noteContentDiv.classList.add('note-content', 'collapsed'); // Добавляем класс collapsed
     noteContentDiv.textContent = decrypt(note, encryptionKey);
 
     const deleteBtn = document.createElement('button');
@@ -188,13 +196,20 @@
       saveNotes(); // Сохраняем изменения
       renderNotes(); // Обновляем отображение заметок
     });
+
     noteHeader.appendChild(deleteBtn);
     li.appendChild(noteHeader);
     li.appendChild(noteContentDiv);
+
+    li.querySelector('.toggle-icon').addEventListener('click', () => {
+      li.classList.toggle('collapsed');
+      noteContentDiv.classList.toggle('collapsed'); // Переключаем класс collapsed для содержания
+      li.querySelector('.toggle-icon').textContent = noteContentDiv.classList.contains('collapsed') ? '▶️' : '▼'; // Меняем иконку
+    });
+
     notesList.appendChild(li);
   });
 }
-
 
 
     function saveNotes() {
