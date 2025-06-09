@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Защищённый блокнот со сворачиванием заметок</title>
+<title>Защищённый блокнот с редактированием заметок</title>
 <style>
   body {
     margin: 0; padding: 0; font-family: Arial, sans-serif;
@@ -32,7 +32,7 @@
     margin-bottom: 0.3rem;
     font-weight: bold;
   }
-  input[type="password"], textarea {
+  input[type="password"], textarea, .edit-textarea {
     padding: 0.5rem;
     font-size: 1rem;
     border: 1px solid #ccc;
@@ -41,7 +41,7 @@
     box-sizing: border-box;
     margin-bottom: 1rem;
   }
-  textarea {
+  textarea, .edit-textarea {
     resize: vertical;
     min-height: 120px;
   }
@@ -90,6 +90,13 @@
   li.collapsed .note-content {
     display: none;
   }
+  li .note-actions {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    display: flex;
+    gap: 5px;
+  }
   li button.delete-btn {
     background: #dc3545;
     border: none;
@@ -98,13 +105,33 @@
     padding: 0.2rem 0.5rem;
     border-radius: 3px;
     cursor: pointer;
-    margin-left: 10px;
-    position: absolute;
-    top: 5px;
-    right: 5px;
   }
-  li button.delete-btn:active {
-    background: #a71d2a;
+  li button.edit-btn {
+    background: #ffc107;
+    border: none;
+    color: black;
+    font-weight: bold;
+    padding: 0.2rem 0.5rem;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+  li button.save-btn {
+    background: #28a745;
+    border: none;
+    color: white;
+    font-weight: bold;
+    padding: 0.2rem 0.5rem;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+  li button.cancel-btn {
+    background: #6c757d;
+    border: none;
+    color: white;
+    font-weight: bold;
+    padding: 0.2rem 0.5rem;
+    border-radius: 3px;
+    cursor: pointer;
   }
   li .toggle-icon {
     font-size: 1.2em;
@@ -118,6 +145,16 @@
     color: red;
     margin-bottom: 1rem;
     text-align: center;
+  }
+  .edit-mode .note-content {
+    display: none;
+  }
+  .edit-mode .edit-textarea {
+    display: block;
+    margin-top: 0.5rem;
+  }
+  .edit-textarea {
+    display: none;
   }
 </style>
 </head>
@@ -174,9 +211,10 @@
       notesList.innerHTML = '';
       notes.forEach((encryptedNote, index) => {
         const decryptedContent = decrypt(encryptedNote, encryptionKey);
-        if (decryptedContent === null) return; // Пропускаем нерасшифрованные заметки
+        if (decryptedContent === null) return;
 
         const li = document.createElement('li');
+        const isEditing = li.classList.contains('edit-mode');
         
         const noteHeader = document.createElement('div');
         noteHeader.classList.add('note-header');
@@ -189,25 +227,91 @@
         noteContentDiv.classList.add('note-content');
         noteContentDiv.textContent = decryptedContent;
 
+        const editTextarea = document.createElement('textarea');
+        editTextarea.classList.add('edit-textarea');
+        editTextarea.value = decryptedContent;
+
+        const actionsDiv = document.createElement('div');
+        actionsDiv.classList.add('note-actions');
+
         const deleteBtn = document.createElement('button');
         deleteBtn.classList.add('delete-btn');
-        deleteBtn.textContent = 'Удалить';
+        deleteBtn.textContent = '×';
         
-        deleteBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          notes.splice(index, 1);
-          saveNotes();
-          renderNotes();
-        });
+        const editBtn = document.createElement('button');
+        editBtn.classList.add('edit-btn');
+        editBtn.textContent = '✏️';
+        
+        const saveBtn = document.createElement('button');
+        saveBtn.classList.add('save-btn');
+        saveBtn.textContent = '✓';
+        saveBtn.style.display = 'none';
+        
+        const cancelBtn = document.createElement('button');
+        cancelBtn.classList.add('cancel-btn');
+        cancelBtn.textContent = '✕';
+        cancelBtn.style.display = 'none';
 
-        noteHeader.appendChild(deleteBtn);
+        actionsDiv.appendChild(editBtn);
+        actionsDiv.appendChild(deleteBtn);
+        actionsDiv.appendChild(saveBtn);
+        actionsDiv.appendChild(cancelBtn);
+        noteHeader.appendChild(actionsDiv);
+        
         li.appendChild(noteHeader);
         li.appendChild(noteContentDiv);
+        li.appendChild(editTextarea);
 
+        // Удаление заметки
+        deleteBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (confirm('Удалить эту заметку?')) {
+            notes.splice(index, 1);
+            saveNotes();
+            renderNotes();
+          }
+        });
+
+        // Редактирование заметки
+        editBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          li.classList.add('edit-mode');
+          editBtn.style.display = 'none';
+          deleteBtn.style.display = 'none';
+          saveBtn.style.display = 'inline-block';
+          cancelBtn.style.display = 'inline-block';
+          editTextarea.focus();
+        });
+
+        // Сохранение изменений
+        saveBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const newText = editTextarea.value.trim();
+          if (newText) {
+            notes[index] = encrypt(newText, encryptionKey);
+            saveNotes();
+            renderNotes();
+          }
+        });
+
+        // Отмена редактирования
+        cancelBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          li.classList.remove('edit-mode');
+          editBtn.style.display = 'inline-block';
+          deleteBtn.style.display = 'inline-block';
+          saveBtn.style.display = 'none';
+          cancelBtn.style.display = 'none';
+          editTextarea.value = decryptedContent;
+        });
+
+        // Сворачивание/разворачивание
         noteHeader.addEventListener('click', () => {
-          li.classList.toggle('collapsed');
-          const icon = li.querySelector('.toggle-icon');
-          icon.textContent = li.classList.contains('collapsed') ? '▶️' : '▼';
+          if (!li.classList.contains('edit-mode')) {
+            li.classList.toggle('collapsed');
+            const icon = li.querySelector('.toggle-icon');
+            icon.textContent = li.classList.contains('collapsed') ? '▶️' : '▼';
+          }
         });
 
         notesList.appendChild(li);
@@ -265,14 +369,12 @@
       notesSection.style.display = 'none';
     });
 
-    // Обработка нажатия Enter в поле пароля
     passwordInput.addEventListener('keypress', (e) => {
       if (e.key === 'Enter') {
         loginBtn.click();
       }
     });
 
-    // Обработка нажатия Enter в поле заметки (с Shift+Enter для переноса строки)
     noteText.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
