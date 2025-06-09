@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Защищённый блокнот со сворачиванием заметок</title>
+<style>
+  body {
+    margin: 0; padding: 0; font-family: Arial, sans-serif;
+    background: #f0f0f0;
+  }
+  .container {
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 1rem;
+    background: #fff;
+    min-height: 100vh;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+  }
+  h1 {
+    text-align: center;
+    margin-bottom: 1rem;
+  }
+  #login-section, #notes-section {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+  }
+  label {
+    margin-bottom: 0.3rem;
+    font-weight: bold;
+  }
+  input[type="password"], textarea {
+    padding: 0.5rem;
+    font-size: 1rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    width: 100%;
+    box-sizing: border-box;
+    margin-bottom: 1rem;
+  }
+  textarea {
+    resize: vertical;
+    min-height: 120px;
+  }
+  button {
+    padding: 0.7rem;
+    font-size: 1rem;
+    background: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-bottom: 1rem;
+  }
+  button:active {
+    background: #0056b3;
+  }
+  ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    overflow-y: auto;
+    flex-grow: 1;
+  }
+  li {
+    background: #fafafa;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+    padding: 0.5rem 0.7rem 0.7rem 0.7rem;
+    position: relative;
+    font-size: 1em;
+    word-wrap: break-word;
+  }
+  li .note-header {
+    cursor: pointer;
+    font-weight: bold;
+    user-select: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  li .note-content {
+    margin-top: 0.5rem;
+    white-space: pre-wrap;
+  }
+  li.collapsed .note-content {
+    display: none;
+  }
+  li button.delete-btn {
+    background: #dc3545;
+    border: none;
+    color: white;
+    font-weight: bold;
+    padding: 0.2rem 0.5rem;
+    border-radius: 3px;
+    cursor: pointer;
+    margin-left: 10px;
+    position: absolute;
+    top: 5px;
+    right: 5px;
+  }
+  li button.delete-btn:active {
+    background: #a71d2a;
+  }
+  li .toggle-icon {
+    font-size: 1.2em;
+    user-select: none;
+    transition: transform 0.3s ease;
+  }
+  li.collapsed .toggle-icon {
+    transform: rotate(-90deg);
+  }
+  .error {
+    color: red;
+    margin-bottom: 1rem;
+    text-align: center;
+  }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Защищённый блокнот</h1>
+
+    <section id="login-section">
+      <label for="password">Введите пароль:</label>
+      <input type="password" id="password" autocomplete="off" />
+      <button id="login-btn">Войти</button>
+      <div class="error" id="login-error"></div>
+    </section>
+
+    <section id="notes-section" style="display:none;">
+      <textarea id="note-text" placeholder="Введите новую заметку..."></textarea>
+      <button id="add-note-btn">Добавить заметку</button>
+      <ul id="notes-list"></ul>
+      <button id="logout-btn" style="background:#6c757d;">Выйти</button>
+    </section>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+  <script>
+    const loginSection = document.getElementById('login-section');
+    const notesSection = document.getElementById('notes-section');
+    const passwordInput = document.getElementById('password');
+    const loginBtn = document.getElementById('login-btn');
+    const loginError = document.getElementById('login-error');
+
+    const noteText = document.getElementById('note-text');
+    const addNoteBtn = document.getElementById('add-note-btn');
+    const notesList = document.getElementById('notes-list');
+    const logoutBtn = document.getElementById('logout-btn');
+
+    let encryptionKey = null;
+    let notes = [];
+
+    function encrypt(text, key) {
+      return CryptoJS.AES.encrypt(text, key).toString();
+    }
+
+    function decrypt(ciphertext, key) {
+      try {
+        const bytes = CryptoJS.AES.decrypt(ciphertext, key);
+        return bytes.toString(CryptoJS.enc.Utf8);
+      } catch (e) {
+        console.error("Ошибка при расшифровке:", e);
+        return null; // Или другое значение по умолчанию
+      }
+    }
+
+  function renderNotes() {
+  notesList.innerHTML = ''; // Очищаем список перед обновлением
+  notes.forEach((note, index) => {
+    const li = document.createElement('li');
+    li.classList.add('note-item');
+    
+    const noteContentDiv = document.createElement('div');
+    noteContentDiv.textContent = decrypt(note, encryptionKey);
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.classList.add('delete-btn');
+    deleteBtn.textContent = 'Удалить';
+    
+    deleteBtn.addEventListener('click', () => {
+      notes.splice(index, 1); // Удаляем заметку из массива
+      saveNotes(); // Сохраняем изменения
+      renderNotes(); // Обновляем отображение заметок
+    });
+    noteHeader.appendChild(deleteBtn);
+    li.appendChild(noteHeader);
+    li.appendChild(noteContentDiv);
+    notesList.appendChild(li);
+  });
+}
+
+
+
+    function saveNotes() {
+      const encryptedNotes = notes.map(note => encrypt(note, encryptionKey));
+      localStorage.setItem('notes', JSON.stringify(encryptedNotes));
+    }
+
+    function loadNotes() {
+      const storedNotes = localStorage.getItem('notes');
+      if (storedNotes) {
+        try {
+          const encryptedNotes = JSON.parse(storedNotes);
+          notes = encryptedNotes.map(encryptedNote => decrypt(encryptedNote, encryptionKey));
+          // Filter out any null (failed decryption) notes
+          notes = notes.filter(note => note !== null);
+        } catch (e) {
+          console.error("Ошибка при загрузке заметок:", e);
+          notes = [];
+        }
+      } else
+{
+        notes = [];
+      }
+    }
+
+
+    loginBtn.addEventListener('click', () => {
+      const password = passwordInput.value;
+      if (password) {
+        encryptionKey = CryptoJS.SHA256(password).toString();
+        loadNotes();
+        renderNotes();
+        loginSection.style.display = 'none';
+        notesSection.style.display = 'flex';
+        loginError.textContent = '';
+      } else {
+        loginError.textContent = 'Введите пароль.';
+      }
+    });
+
+    addNoteBtn.addEventListener('click', () => {
+      const text = noteText.value.trim();
+      if (text) {
+        notes.push(text);
+        saveNotes();
+        renderNotes();
+        noteText.value = '';
+      }
+    });
+
+    logoutBtn.addEventListener('click', () => {
+      encryptionKey = null;
+      notes = [];
+      localStorage.removeItem('notes');
+      notesSection.style.display = 'none';
+      loginSection.style.display = 'flex';
+      passwordInput.value = '';
+    });
+
+  </script>
+</body>
+</html>
