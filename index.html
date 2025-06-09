@@ -119,7 +119,7 @@
     margin-bottom: 1rem;
     text-align: center;
   }
-  </style>
+</style>
 </head>
 <body>
   <div class="container">
@@ -166,76 +166,71 @@
         return bytes.toString(CryptoJS.enc.Utf8);
       } catch (e) {
         console.error("Ошибка при расшифровке:", e);
-        return null; // Или другое значение по умолчанию
+        return null;
       }
     }
 
- 
     function renderNotes() {
-  notesList.innerHTML = ''; // Очищаем список перед обновлением
-  notes.forEach((note, index) => {
-    const li = document.createElement('li');
-    li.classList.add('note-item');
-    
-    const noteHeader = document.createElement('div');
-    noteHeader.classList.add('note-header');
-    noteHeader.innerHTML = `
-      <span class="toggle-icon">▶️</span>
-      Заметка ${index + 1}
-    `;
-    
-    const noteContentDiv = document.createElement('div');
-    noteContentDiv.classList.add('note-content', 'collapsed'); // Добавляем класс collapsed
-    noteContentDiv.textContent = decrypt(note, encryptionKey);
+      notesList.innerHTML = '';
+      notes.forEach((encryptedNote, index) => {
+        const decryptedContent = decrypt(encryptedNote, encryptionKey);
+        if (decryptedContent === null) return; // Пропускаем нерасшифрованные заметки
 
-    const deleteBtn = document.createElement('button');
-    deleteBtn.classList.add('delete-btn');
-    deleteBtn.textContent = 'Удалить';
-    
-    deleteBtn.addEventListener('click', () => {
-      notes.splice(index, 1); // Удаляем заметку из массива
-      saveNotes(); // Сохраняем изменения
-      renderNotes(); // Обновляем отображение заметок
-    });
+        const li = document.createElement('li');
+        
+        const noteHeader = document.createElement('div');
+        noteHeader.classList.add('note-header');
+        noteHeader.innerHTML = `
+          <span class="toggle-icon">▶️</span>
+          Заметка ${index + 1}
+        `;
+        
+        const noteContentDiv = document.createElement('div');
+        noteContentDiv.classList.add('note-content');
+        noteContentDiv.textContent = decryptedContent;
 
-    noteHeader.appendChild(deleteBtn);
-    li.appendChild(noteHeader);
-    li.appendChild(noteContentDiv);
+        const deleteBtn = document.createElement('button');
+        deleteBtn.classList.add('delete-btn');
+        deleteBtn.textContent = 'Удалить';
+        
+        deleteBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          notes.splice(index, 1);
+          saveNotes();
+          renderNotes();
+        });
 
-    li.querySelector('.toggle-icon').addEventListener('click', () => {
-      li.classList.toggle('collapsed');
-      noteContentDiv.classList.toggle('collapsed'); // Переключаем класс collapsed для содержания
-      li.querySelector('.toggle-icon').textContent = noteContentDiv.classList.contains('collapsed') ? '▶️' : '▼'; // Меняем иконку
-    });
+        noteHeader.appendChild(deleteBtn);
+        li.appendChild(noteHeader);
+        li.appendChild(noteContentDiv);
 
-    notesList.appendChild(li);
-  });
-}
+        noteHeader.addEventListener('click', () => {
+          li.classList.toggle('collapsed');
+          const icon = li.querySelector('.toggle-icon');
+          icon.textContent = li.classList.contains('collapsed') ? '▶️' : '▼';
+        });
 
+        notesList.appendChild(li);
+      });
+    }
 
     function saveNotes() {
-      const encryptedNotes = notes.map(note => encrypt(note, encryptionKey));
-      localStorage.setItem('notes', JSON.stringify(encryptedNotes));
+      localStorage.setItem('notes', JSON.stringify(notes));
     }
 
     function loadNotes() {
       const storedNotes = localStorage.getItem('notes');
       if (storedNotes) {
         try {
-          const encryptedNotes = JSON.parse(storedNotes);
-          notes = encryptedNotes.map(encryptedNote => decrypt(encryptedNote, encryptionKey));
-          // Filter out any null (failed decryption) notes
-          notes = notes.filter(note => note !== null);
+          notes = JSON.parse(storedNotes);
         } catch (e) {
           console.error("Ошибка при загрузке заметок:", e);
           notes = [];
         }
-      } else
-{
+      } else {
         notes = [];
       }
     }
-
 
     loginBtn.addEventListener('click', () => {
       const password = passwordInput.value;
@@ -254,7 +249,8 @@
     addNoteBtn.addEventListener('click', () => {
       const text = noteText.value.trim();
       if (text) {
-        notes.push(text);
+        const encryptedNote = encrypt(text, encryptionKey);
+        notes.push(encryptedNote);
         saveNotes();
         renderNotes();
         noteText.value = '';
@@ -264,12 +260,25 @@
     logoutBtn.addEventListener('click', () => {
       encryptionKey = null;
       notes = [];
-      localStorage.removeItem('notes');
-      notesSection.style.display = 'none';
-      loginSection.style.display = 'flex';
       passwordInput.value = '';
+      loginSection.style.display = 'flex';
+      notesSection.style.display = 'none';
     });
 
+    // Обработка нажатия Enter в поле пароля
+    passwordInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        loginBtn.click();
+      }
+    });
+
+    // Обработка нажатия Enter в поле заметки (с Shift+Enter для переноса строки)
+    noteText.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        addNoteBtn.click();
+      }
+    });
   </script>
 </body>
 </html>
