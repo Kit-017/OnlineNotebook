@@ -200,13 +200,90 @@
     function decrypt(ciphertext, key) {
       try {
         const bytes = CryptoJS.AES.decrypt(ciphertext, key);
-        return bytes.toString(CryptoJS.enc.Utf8);
+        const result = bytes.toString(CryptoJS.enc.Utf8);
+        if (!result) throw new Error("Неверный пароль");
+        return result;
       } catch (e) {
         console.error("Ошибка при расшифровке:", e);
         return null;
       }
     }
 
+    function validatePassword(password) {
+      // Минимальные требования к паролю
+      return password.length >= 6;
+    }
+
+    function getPasswordHash(password) {
+      return CryptoJS.SHA256(password).toString();
+    }
+
+    function checkPassword(password) {
+      const storedHash = localStorage.getItem('passwordHash');
+      if (!storedHash) {
+        // Первый вход - сохраняем хеш нового пароля
+        localStorage.setItem('passwordHash', getPasswordHash(password));
+        return true;
+      }
+      return storedHash === getPasswordHash(password);
+    }
+
+    function renderNotes() {
+      notesList.innerHTML = '';
+      
+      try {
+        notes.forEach((encryptedNote, index) => {
+          const decryptedContent = decrypt(encryptedNote, encryptionKey);
+          if (decryptedContent === null) {
+            throw new Error("Неверный пароль");
+          }
+          
+          // ... (остальная часть функции без изменений) ...
+        });
+      } catch (e) {
+        logout();
+        loginError.textContent = "Неверный пароль! Доступ запрещён.";
+      }
+    }
+
+    function logout() {
+      encryptionKey = null;
+      notes = [];
+      passwordInput.value = '';
+      loginSection.style.display = 'flex';
+      notesSection.style.display = 'none';
+    }
+
+    loginBtn.addEventListener('click', () => {
+      const password = passwordInput.value;
+      
+      if (!validatePassword(password)) {
+        loginError.textContent = 'Пароль должен содержать минимум 6 символов';
+        return;
+      }
+      
+      if (!checkPassword(password)) {
+        loginError.textContent = 'Неверный пароль!';
+        return;
+      }
+      
+      encryptionKey = getPasswordHash(password);
+      loadNotes();
+      
+      // Проверяем, что хотя бы одна заметка расшифровывается
+      if (notes.length > 0) {
+        const testDecrypt = decrypt(notes[0], encryptionKey);
+        if (testDecrypt === null) {
+          loginError.textContent = 'Неверный пароль!';
+          return;
+        }
+      }
+      
+      renderNotes();
+      loginSection.style.display = 'none';
+      notesSection.style.display = 'flex';
+      loginError.textContent = '';
+    });
     function renderNotes() {
       notesList.innerHTML = '';
       notes.forEach((encryptedNote, index) => {
